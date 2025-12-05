@@ -33,8 +33,9 @@ const app = (0, express_1.default)();
 const server = (0, http_1.createServer)(app);
 const io = new socket_io_1.Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL || 'https://frontend-real-time.vercel.app',
+        origin: ['https://frontend-real-time.vercel.app', 'http://localhost:3000'],
         methods: ['GET', 'POST'],
+        credentials: true,
     },
 });
 // Peer.js server for WebRTC (acts as STUN/TURN server)
@@ -45,7 +46,8 @@ app.use('/peerjs', peerServer);
 const PORT = process.env.PORT || 3002;
 // Middleware
 app.use((0, cors_1.default)({
-    origin: process.env.FRONTEND_URL || 'https://frontend-real-time.vercel.app',
+    origin: ['https://frontend-real-time.vercel.app', 'http://localhost:3000'], // Agrega localhost para desarrollo
+    methods: ['GET', 'POST'],
     credentials: true,
 }));
 app.use(express_1.default.json());

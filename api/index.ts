@@ -31,8 +31,9 @@ const app = express();
 const server = createServer(app);
 const io = new SocketIOServer(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'https://frontend-real-time.vercel.app',
+    origin: ['https://frontend-real-time.vercel.app', 'http://localhost:3000'],
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 
@@ -47,7 +48,8 @@ const PORT = process.env.PORT || 3002;
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'https://frontend-real-time.vercel.app',
+  origin: ['https://frontend-real-time.vercel.app', 'http://localhost:3000'],  // Agrega localhost para desarrollo
+  methods: ['GET', 'POST'],
   credentials: true,
 }));
 app.use(express.json());
