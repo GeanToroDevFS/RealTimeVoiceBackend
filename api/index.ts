@@ -1,5 +1,20 @@
 /**
  * Main server entrypoint for the RealTime voice backend.
+ *
+ * This module:
+ *  - Loads environment variables via dotenv.
+ *  - Creates and configures an Express application with Socket.IO and Peer.js.
+ *  - Applies global middleware (CORS).
+ *  - Initializes voice service with Peer.js for WebRTC.
+ *  - Exposes simple health and debug endpoints.
+ *  - Starts the HTTP server on the configured PORT.
+ *
+ * Environment variables used:
+ *  - PORT (optional): Port to listen on (defaults to 3002)
+ *  - NODE_ENV: Environment name used in /debug response
+ *  - FIREBASE_PROJECT_ID: Presence reported in /debug
+ *  - FRONTEND_URL: Used by CORS
+ *  - JWT_SECRET: For auth (if needed)
  */
 
 import dotenv from 'dotenv';
@@ -14,83 +29,66 @@ import { initializeVoice } from './services/voiceService';
 
 const app = express();
 const server = createServer(app);
-
-// Configuración de Socket.IO
 const io = new SocketIOServer(server, {
   cors: {
-    origin: ['https://frontend-real-time.vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
+    origin: ['https://frontend-real-time.vercel.app', 'http://localhost:3000'],
     methods: ['GET', 'POST'],
     credentials: true,
   },
-  transports: ['websocket', 'polling'],
 });
 
-// IMPORTANTE: Configuración CORRECTA de Peer.js
+// Peer.js server for WebRTC (acts as STUN/TURN server)
+// IMPORTANTE: Configuración simplificada para Render
 const peerOptions = {
   path: '/peerjs',
-  debug: process.env.NODE_ENV === 'development' ? 3 : 1,
+  debug: true,
   proxied: true, // CRÍTICO para Render
-  // NO configurar host, port, o ssl - dejar que ExpressPeerServer lo maneje
 };
 
 const peerServer = ExpressPeerServer(server, peerOptions);
 
-// Logs de Peer.js
-peerServer.on('connection', (client: any) => {
-  console.log(`🔗 [PEER] Cliente conectado: ${client.getId()}`);
-});
-
-peerServer.on('disconnect', (client: any) => {
-  console.log(`🔌 [PEER] Cliente desconectado: ${client.getId()}`);
-});
-
-// Montar Peer.js en la ruta correcta
 app.use('/peerjs', peerServer);
 
 const PORT = process.env.PORT || 3002;
 
-// Middleware CORS
+// Middleware
 app.use(cors({
-  origin: ['https://frontend-real-time.vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  origin: ['https://frontend-real-time.vercel.app', 'http://localhost:3000'],
+  methods: ['GET', 'POST'],
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-
 app.use(express.json());
 
 // Health check
 app.get('/', (req, res) => {
-  res.json({
-    status: 'healthy',
-    service: 'RealTime Voice Backend',
-    version: '1.0.0',
-  });
+  console.log('🚀 [HEALTH] Solicitud de health check en voz');
+  res.send('🚀 Backend de voz para RealTime funcionando correctamente.');
 });
 
 // Debug endpoint
 app.get('/debug', (req, res) => {
+  console.log('🔍 [DEBUG] Solicitud de información de debug en voz');
   res.json({
-    environment: process.env.NODE_ENV || 'development',
-    peerJsPath: '/peerjs',
+    environment: process.env.NODE_ENV,
+    firebaseProjectId: process.env.FIREBASE_PROJECT_ID ? '✅ Configurado' : '❌ No configurado',
+    port: PORT,
     socketIo: '✅ Inicializado',
+    peerJs: '✅ Inicializado',
   });
 });
 
-// Ruta específica para el endpoint que Peer.js está buscando
-app.get('/peerjs/id', (req, res) => {
-  console.log('📡 [PEER] ID endpoint accedido');
-  res.json({
-    message: 'Peer.js ID endpoint',
-    timestamp: new Date().toISOString(),
-  });
+// Error handling
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('💥 [ERROR] Error no manejado en voz:', err.message);
+  res.status(500).json({ error: 'Error interno del servidor' });
 });
 
-// Inicializar servicio de voz
+// Initialize voice service
 initializeVoice(io, peerServer);
 
-// Iniciar servidor
+// Start server
 server.listen(PORT, () => {
-  console.log(`🌐 [STARTUP] Servidor de voz iniciado en puerto ${PORT}`);
-  console.log(`🔗 Peer.js disponible en: http://localhost:${PORT}/peerjs`);
+  console.log(`🌐 [STARTUP] Servidor de voz corriendo en puerto ${PORT}`);
+  console.log(`🔍 [STARTUP] Debug disponible en: http://localhost:${PORT}/debug`);
+  console.log(`🔗 [STARTUP] Peer.js disponible en: /peerjs`);
 });
