@@ -64,13 +64,13 @@ const initializeVoice = (io, peerServer) => {
             // Send existing peers to the new user for connection
             socket.emit('voice-joined', { peers: Array.from(peers).filter(p => p !== peerId) });
         });
-        socket.on('leave-voice-room', (meetingId) => {
-            socket.leave(meetingId);
-            const peers = activePeers.get(meetingId);
+        socket.on('leave-voice-room', (data) => {
+            socket.leave(data.meetingId);
+            const peers = activePeers.get(data.meetingId);
             if (peers) {
-                peers.delete(socket.id); // Assuming peerId is socket.id for simplicity
-                io.to(meetingId).emit('peer-disconnected', socket.id);
-                console.log(`🚪 [VOICE] User ${socket.id} left voice in meeting: ${meetingId}`);
+                peers.delete(data.peerId); // Usar data.peerId en lugar de socket.id
+                io.to(data.meetingId).emit('peer-disconnected', data.peerId);
+                console.log(`🚪 [VOICE] User ${data.peerId} left voice in meeting: ${data.meetingId}`);
             }
         });
         socket.on('disconnect', () => {

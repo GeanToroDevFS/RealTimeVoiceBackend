@@ -4,14 +4,14 @@
  * @description
  * Loads environment variables, parses the Firebase service account JSON, validates
  * required environment variables, initializes the Firebase Admin SDK and exports
- * Firestore client for use in voice operations.
+ * Firestore client and Auth for use in voice operations.
  *
  * Expected environment variables:
  *  - FIREBASE_PROJECT_ID: Firebase project id (string)
  *  - FIREBASE_SERVICE_ACCOUNT_KEY: JSON string of the Firebase service account
  *
  * Usage:
- *  import { db } from './config/firebase';
+ *  import { db, auth } from './config/firebase';
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -50,7 +50,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.db = void 0;
+exports.auth = exports.db = void 0;
 const admin = __importStar(require("firebase-admin"));
 const dotenv_1 = __importDefault(require("dotenv"));
 console.log('🔹 [FIREBASE] Cargando configuración para servidor de voz...');
@@ -88,4 +88,10 @@ admin.initializeApp({
  */
 const db = admin.firestore();
 exports.db = db;
+/**
+ * Firebase Authentication client instance to manage users and tokens (for future use).
+ * @type {admin.auth.Auth}
+ */
+const auth = admin.auth();
+exports.auth = auth;
 console.log('✅ [FIREBASE] Cliente inicializado correctamente para servidor de voz.');
