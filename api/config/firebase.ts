@@ -3,14 +3,14 @@
  * @description
  * Loads environment variables, parses the Firebase service account JSON, validates
  * required environment variables, initializes the Firebase Admin SDK and exports
- * Firestore client for use in voice operations.
+ * Firestore client and Auth for use in voice operations.
  *
  * Expected environment variables:
  *  - FIREBASE_PROJECT_ID: Firebase project id (string)
  *  - FIREBASE_SERVICE_ACCOUNT_KEY: JSON string of the Firebase service account
  *
  * Usage:
- *  import { db } from './config/firebase';
+ *  import { db, auth } from './config/firebase';
  */
 
 import * as admin from 'firebase-admin';
@@ -56,6 +56,13 @@ admin.initializeApp({
  */
 const db = admin.firestore();
 
+/**
+ * Firebase Authentication client instance to manage users and tokens (for future use).
+ * @type {admin.auth.Auth}
+ */
+const auth = admin.auth();
+
 console.log('✅ [FIREBASE] Cliente inicializado correctamente para servidor de voz.');
 
-export { db };
+// Export the db and auth instances
+export { db, auth };
