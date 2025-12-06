@@ -142,16 +142,14 @@ app.use(express.json());
 // Health check
 app.get('/', (req, res) => {
   console.log('🚀 [HEALTH] Solicitud de health check en voz');
+  res.header('Content-Type', 'text/plain');
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.json({
-    status: 'healthy',
-    service: 'RealTime Voice Backend',
-    port: PORT,
-    peerjs: 'available',
-    cors: 'enabled',
-    allowedOrigins: allowedOrigins,
-    timestamp: new Date().toISOString()
-  });
+  res.send('🚀 Backend de voz para RealTime funcionando correctamente.\n' +
+    'Servicio: RealTime Voice Backend\n' +
+    `Puerto: ${PORT}\n` +
+    'Peer.js: Disponible\n' +
+    'CORS: Habilitado\n' +
+    `Timestamp: ${new Date().toISOString()}`);
 });
 
 // Debug endpoint
