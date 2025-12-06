@@ -97,15 +97,15 @@ const io = new SocketIOServer(server, {
 });
 
 // Peer.js server for WebRTC - CONFIGURACIÓN CORREGIDA
-const peerOptions = {
+const peerOptions: any = {
   path: '/peerjs',
-  debug: process.env.NODE_ENV === 'development', // Solo debug en desarrollo
+  debug: true,
   proxied: true // CRÍTICO para Render
 };
 
 console.log('🔧 [PEER] Configurando Peer.js con opciones:', peerOptions);
 
-const peerServer = ExpressPeerServer(server, peerOptions);
+const peerServer = ExpressPeerServer(server, peerOptions as any);
 
 // Eventos de Peer.js para debugging
 peerServer.on('connection', (client: any) => {
