@@ -39,49 +39,75 @@ const initializeVoice = (io, peerServer) => {
     // Socket.IO events for voice signaling
     io.on('connection', (socket) => {
         console.log(`🔗 [VOICE] Socket connected: ${socket.id}`);
+        // Autenticación del socket
+        socket.on('authenticate', (data) => {
+            // Aquí puedes validar el token JWT si es necesario
+            console.log(`🔐 [VOICE] Socket ${socket.id} autenticado`);
+        });
         socket.on('join-voice-room', async (data) => {
             const { meetingId, peerId, userId } = data;
             console.log(`🔹 [VOICE] User ${socket.id} (${userId}) joining voice in meeting: ${meetingId}`);
-            // Validate meeting exists and is active
-            const meetingDoc = await firebase_1.db.collection('meetings').doc(meetingId).get();
-            if (!meetingDoc.exists || meetingDoc.data()?.status !== 'active') {
-                socket.emit('voice-error', 'Meeting not found or inactive');
-                return;
+            try {
+                // Validate meeting exists and is active
+                const meetingDoc = await firebase_1.db.collection('meetings').doc(meetingId).get();
+                if (!meetingDoc.exists || meetingDoc.data()?.status !== 'active') {
+                    socket.emit('voice-error', 'Meeting not found or inactive');
+                    return;
+                }
+                // Limit to 10 users
+                if (!activePeers.has(meetingId))
+                    activePeers.set(meetingId, new Set());
+                const peers = activePeers.get(meetingId);
+                if (peers.size >= 10) {
+                    socket.emit('voice-error', 'Meeting full (maximum 10 users)');
+                    return;
+                }
+                socket.join(meetingId);
+                peers.add(peerId);
+                console.log(`✅ [VOICE] Peer ${peerId} joined voice room: ${meetingId}`);
+                // Notify others in the room to connect via Peer.js
+                socket.to(meetingId).emit('peer-joined', peerId);
+                // Send existing peers to the new user for connection
+                socket.emit('voice-joined', {
+                    peers: Array.from(peers).filter(p => p !== peerId),
+                    meetingId
+                });
             }
-            // Limit to 10 users
-            if (!activePeers.has(meetingId))
-                activePeers.set(meetingId, new Set());
-            const peers = activePeers.get(meetingId);
-            if (peers.size >= 10) {
-                socket.emit('voice-error', 'Meeting full (maximum 10 users)');
-                return;
+            catch (error) {
+                console.error('❌ [VOICE] Error joining voice room:', error);
+                socket.emit('voice-error', 'Internal server error');
             }
-            socket.join(meetingId);
-            peers.add(peerId);
-            console.log(`✅ [VOICE] Peer ${peerId} joined voice room: ${meetingId}`);
-            // Notify others in the room to connect via Peer.js
-            socket.to(meetingId).emit('peer-joined', peerId);
-            // Send existing peers to the new user for connection
-            socket.emit('voice-joined', { peers: Array.from(peers).filter(p => p !== peerId) });
         });
         socket.on('leave-voice-room', (data) => {
-            socket.leave(data.meetingId);
-            const peers = activePeers.get(data.meetingId);
+            const { meetingId, peerId } = data;
+            console.log(`🚪 [VOICE] User ${peerId} leaving voice in meeting: ${meetingId}`);
+            socket.leave(meetingId);
+            const peers = activePeers.get(meetingId);
             if (peers) {
-                peers.delete(data.peerId); // Usar data.peerId en lugar de socket.id
-                io.to(data.meetingId).emit('peer-disconnected', data.peerId);
-                console.log(`🚪 [VOICE] User ${data.peerId} left voice in meeting: ${data.meetingId}`);
+                peers.delete(peerId);
+                io.to(meetingId).emit('peer-disconnected', peerId);
+                // Si no hay más peers, limpiar la reunión
+                if (peers.size === 0) {
+                    activePeers.delete(meetingId);
+                }
             }
         });
-        socket.on('disconnect', () => {
-            console.log(`🔌 [VOICE] Socket disconnected: ${socket.id}`);
+        socket.on('disconnect', (reason) => {
+            console.log(`🔌 [VOICE] Socket disconnected: ${socket.id}, reason: ${reason}`);
             // Cleanup peers on disconnect
             for (const [meetingId, peers] of activePeers) {
                 if (peers.has(socket.id)) {
                     peers.delete(socket.id);
                     io.to(meetingId).emit('peer-disconnected', socket.id);
+                    // Si no hay más peers, limpiar la reunión
+                    if (peers.size === 0) {
+                        activePeers.delete(meetingId);
+                    }
                 }
             }
+        });
+        socket.on('error', (error) => {
+            console.error(`💥 [VOICE] Socket error for ${socket.id}:`, error);
         });
     });
 };

@@ -30,32 +30,77 @@ import { initializeVoice } from './services/voiceService';
 const app = express();
 const server = createServer(app);
 
-// IMPORTANTE: Render asigna un puerto dinámico, no usar 443
 const PORT = process.env.PORT || 10000;
 
-// Configuración de CORS para desarrollo y producción
+// Configuración de CORS COMPLETAMENTE PERMISIVA
+const allowedOrigins = [
+  'https://frontend-real-time.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'https://realtime-frontend.vercel.app'
+];
+
 const corsOptions = {
-  origin: ['https://frontend-real-time.vercel.app', 'http://localhost:3000'],
-  methods: ['GET', 'POST', 'OPTIONS'],
+  origin: (origin: string | undefined, callback: Function) => {
+    // Permitir requests sin origen
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
+      callback(null, true);
+    } else {
+      console.log('🚫 Origen bloqueado por CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 };
 
-// Middleware CORS
+// Middleware CORS global
 app.use(cors(corsOptions));
 
-// Configuración de Socket.IO
-const io = new SocketIOServer(server, {
-  cors: corsOptions,
-  transports: ['websocket', 'polling']
+// Middleware manual para headers CORS
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && (allowedOrigins.includes(origin) || origin.includes('vercel.app'))) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  // Manejar preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
 });
 
-// Peer.js server for WebRTC - Configuración para Render
+// Configuración de Socket.IO con CORS
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin) || origin.includes('vercel.app')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: ['GET', 'POST'],
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization']
+  },
+  transports: ['websocket', 'polling'],
+  allowEIO3: true
+});
+
+// Peer.js server for WebRTC - CONFIGURACIÓN CORREGIDA
 const peerOptions = {
   path: '/peerjs',
-  debug: true,
-  proxied: true, // CRÍTICO para Render
-  // NO especificar puerto, let Render handle it
+  debug: process.env.NODE_ENV === 'development', // Solo debug en desarrollo
+  proxied: true // CRÍTICO para Render
 };
 
 console.log('🔧 [PEER] Configurando Peer.js con opciones:', peerOptions);
@@ -75,18 +120,36 @@ peerServer.on('error', (error: Error) => {
   console.error('💥 [PEER] Error:', error);
 });
 
-app.use('/peerjs', peerServer);
+// Middleware para Peer.js con CORS
+app.use('/peerjs', (req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && (allowedOrigins.includes(origin) || origin.includes('vercel.app'))) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+}, peerServer);
 
 app.use(express.json());
 
 // Health check
 app.get('/', (req, res) => {
   console.log('🚀 [HEALTH] Solicitud de health check en voz');
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.json({
     status: 'healthy',
     service: 'RealTime Voice Backend',
     port: PORT,
     peerjs: 'available',
+    cors: 'enabled',
+    allowedOrigins: allowedOrigins,
     timestamp: new Date().toISOString()
   });
 });
@@ -94,6 +157,7 @@ app.get('/', (req, res) => {
 // Debug endpoint
 app.get('/debug', (req, res) => {
   console.log('🔍 [DEBUG] Solicitud de información de debug en voz');
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.json({
     environment: process.env.NODE_ENV || 'development',
     port: PORT,
@@ -101,17 +165,22 @@ app.get('/debug', (req, res) => {
     socketIo: '✅ Inicializado',
     peerJs: '✅ Inicializado',
     peerJsPath: '/peerjs',
-    cors: corsOptions.origin
+    cors: {
+      enabled: true,
+      origins: allowedOrigins
+    }
   });
 });
 
 // Endpoint para verificar conexión Peer.js
 app.get('/peerjs/health', (req, res) => {
   console.log('📡 [PEER] Health check solicitado');
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.json({
     status: 'running',
     endpoint: 'https://realtimevoicebackend.onrender.com/peerjs',
     webSocketEndpoint: 'wss://realtimevoicebackend.onrender.com/peerjs',
+    cors: 'enabled',
     timestamp: new Date().toISOString()
   });
 });
@@ -119,7 +188,11 @@ app.get('/peerjs/health', (req, res) => {
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('💥 [ERROR] Error no manejado en voz:', err.message);
-  res.status(500).json({ error: 'Error interno del servidor' });
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.status(500).json({ 
+    error: 'Error interno del servidor',
+    message: err.message 
+  });
 });
 
 // Initialize voice service
@@ -132,4 +205,5 @@ server.listen(PORT, () => {
   console.log(`🔍 [STARTUP] Debug disponible en: https://realtimevoicebackend.onrender.com/debug`);
   console.log(`🚀 [STARTUP] Health check: https://realtimevoicebackend.onrender.com/`);
   console.log(`📡 [STARTUP] Peer.js health: https://realtimevoicebackend.onrender.com/peerjs/health`);
+  console.log(`🌍 [STARTUP] CORS habilitado para:`, allowedOrigins);
 });
