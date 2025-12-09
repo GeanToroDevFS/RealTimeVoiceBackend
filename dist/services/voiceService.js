@@ -72,6 +72,12 @@ const initializeVoice = (io, peerServer) => {
                     peers: Array.from(peers).filter(p => p !== peerId),
                     meetingId
                 });
+                // Nuevo: Enviar lista de participantes al unirse 
+                const peersInRoom = Array.from(activePeers.get(meetingId) || []);
+                socket.emit('room-participants', {
+                    participants: peersInRoom.filter(p => p !== peerId).map(p => ({ socketId: p, odiserId: p, displayName: 'User' })) // Ajusta con datos reales
+                });
+                socket.to(meetingId).emit('participant-joined', { socketId: socket.id, odiserId: peerId, displayName: 'User' });
             }
             catch (error) {
                 console.error('❌ [VOICE] Error joining voice room:', error);
@@ -91,6 +97,27 @@ const initializeVoice = (io, peerServer) => {
                     activePeers.delete(meetingId);
                 }
             }
+        });
+        // Nuevo: Eventos para señalización WebRTC
+        socket.on('webrtc-offer', (data) => {
+            const { targetSocketId, offer } = data;
+            console.log(`📞 [VOICE] Forwarding offer from ${socket.id} to ${targetSocketId}`);
+            io.to(targetSocketId).emit('webrtc-offer', { senderSocketId: socket.id, offer });
+        });
+        socket.on('webrtc-answer', (data) => {
+            const { targetSocketId, answer } = data;
+            console.log(`📞 [VOICE] Forwarding answer from ${socket.id} to ${targetSocketId}`);
+            io.to(targetSocketId).emit('webrtc-answer', { senderSocketId: socket.id, answer });
+        });
+        socket.on('ice-candidate', (data) => {
+            const { targetSocketId, candidate } = data;
+            console.log(`🧊 [VOICE] Forwarding ICE candidate from ${socket.id} to ${targetSocketId}`);
+            io.to(targetSocketId).emit('ice-candidate', { senderSocketId: socket.id, candidate });
+        });
+        socket.on('media-state-change', (data) => {
+            const { roomId, isAudioEnabled, isVideoEnabled } = data;
+            // Actualiza estado en activePeers si tienes un mapa de participantes
+            socket.to(roomId).emit('media-state-changed', { socketId: socket.id, isAudioEnabled, isVideoEnabled });
         });
         socket.on('disconnect', (reason) => {
             console.log(`🔌 [VOICE] Socket disconnected: ${socket.id}, reason: ${reason}`);
