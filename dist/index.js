@@ -109,6 +109,10 @@ peerServer.on('disconnect', (client) => {
 peerServer.on('error', (error) => {
     console.error('💥 [PEER] Error:', error);
 });
+// Nuevo: Log en llamadas (como en proyectos funcionales)
+peerServer.on('call', (call) => {
+    console.log(`📞 [PEER] Llamada iniciada entre ${call.origin} y ${call.peer}`);
+});
 // Middleware para Peer.js con CORS
 app.use('/peerjs', (req, res, next) => {
     const origin = req.headers.origin;

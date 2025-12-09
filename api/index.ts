@@ -44,7 +44,7 @@ const corsOptions = {
   origin: (origin: string | undefined, callback: Function) => {
     // Permitir requests sin origen
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
       callback(null, true);
     } else {
@@ -69,12 +69,12 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
   res.header('Access-Control-Allow-Credentials', 'true');
-  
+
   // Manejar preflight requests
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
-  
+
   next();
 });
 
@@ -111,13 +111,15 @@ const peerServer = ExpressPeerServer(server, peerOptions as any);
 peerServer.on('connection', (client: any) => {
   console.log(`🔗 [PEER] Cliente conectado: ${client.getId()}`);
 });
-
 peerServer.on('disconnect', (client: any) => {
   console.log(`🔌 [PEER] Cliente desconectado: ${client.getId()}`);
 });
-
 peerServer.on('error', (error: Error) => {
   console.error('💥 [PEER] Error:', error);
+});
+// Nuevo: Log en llamadas (como en proyectos funcionales)
+peerServer.on('call', (call: any) => {
+  console.log(`📞 [PEER] Llamada iniciada entre ${call.origin} y ${call.peer}`);
 });
 
 // Middleware para Peer.js con CORS
@@ -129,11 +131,11 @@ app.use('/peerjs', (req, res, next) => {
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
-  
+
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
-  
+
   next();
 }, peerServer);
 
@@ -187,9 +189,9 @@ app.get('/peerjs/health', (req, res) => {
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('💥 [ERROR] Error no manejado en voz:', err.message);
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Error interno del servidor',
-    message: err.message 
+    message: err.message
   });
 });
 

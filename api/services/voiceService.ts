@@ -77,9 +77,9 @@ export const initializeVoice = (io: SocketIOServer, peerServer: any) => {
         // Notify others in the room to connect via Peer.js
         socket.to(meetingId).emit('peer-joined', peerId);
         // Send existing peers to the new user for connection
-        socket.emit('voice-joined', { 
+        socket.emit('voice-joined', {
           peers: Array.from(peers).filter(p => p !== peerId),
-          meetingId 
+          meetingId
         });
       } catch (error) {
         console.error('❌ [VOICE] Error joining voice room:', error);
