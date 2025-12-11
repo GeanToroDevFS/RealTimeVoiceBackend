@@ -14,6 +14,8 @@ const firebase_1 = require("../config/firebase");
  * Key: meetingId, Value: Set of peer IDs in the meeting.
  */
 const activePeers = new Map();
+// ✅ NUEVO: Relación socket.id ↔ peerId
+const socketToPeer = new Map();
 /**
  * Initialize voice service with Socket.IO and Peer.js.
  *
@@ -41,7 +43,6 @@ const initializeVoice = (io, peerServer) => {
         console.log(`🔗 [VOICE] Socket connected: ${socket.id}`);
         // Autenticación del socket
         socket.on('authenticate', (data) => {
-            // Aquí puedes validar el token JWT si es necesario
             console.log(`🔐 [VOICE] Socket ${socket.id} autenticado`);
         });
         socket.on('join-voice-room', async (data) => {
@@ -64,6 +65,7 @@ const initializeVoice = (io, peerServer) => {
                 }
                 socket.join(meetingId);
                 peers.add(peerId);
+                socketToPeer.set(socket.id, peerId); // ✅ NUEVO: guardar relación
                 console.log(`✅ [VOICE] Peer ${peerId} joined voice room: ${meetingId}`);
                 // Notify others in the room to connect via Peer.js
                 socket.to(meetingId).emit('peer-joined', peerId);
@@ -72,12 +74,18 @@ const initializeVoice = (io, peerServer) => {
                     peers: Array.from(peers).filter(p => p !== peerId),
                     meetingId
                 });
-                // Nuevo: Enviar lista de participantes al unirse 
+                // Enviar lista de participantes al unirse
                 const peersInRoom = Array.from(activePeers.get(meetingId) || []);
                 socket.emit('room-participants', {
-                    participants: peersInRoom.filter(p => p !== peerId).map(p => ({ socketId: p, odiserId: p, displayName: 'User' })) // Ajusta con datos reales
+                    participants: peersInRoom
+                        .filter(p => p !== peerId)
+                        .map(p => ({ socketId: p, odiserId: p, displayName: 'User' }))
                 });
-                socket.to(meetingId).emit('participant-joined', { socketId: socket.id, odiserId: peerId, displayName: 'User' });
+                socket.to(meetingId).emit('participant-joined', {
+                    socketId: socket.id,
+                    odiserId: peerId,
+                    displayName: 'User'
+                });
             }
             catch (error) {
                 console.error('❌ [VOICE] Error joining voice room:', error);
@@ -92,13 +100,20 @@ const initializeVoice = (io, peerServer) => {
             if (peers) {
                 peers.delete(peerId);
                 io.to(meetingId).emit('peer-disconnected', peerId);
-                // Si no hay más peers, limpiar la reunión
                 if (peers.size === 0) {
                     activePeers.delete(meetingId);
                 }
             }
+            // ✅ NUEVO
+            socketToPeer.delete(socket.id);
         });
-        // Nuevo: Eventos para señalización WebRTC
+        socket.on('end-meeting', (data) => {
+            const { meetingId } = data;
+            console.log(`🔴 [VOICE] Meeting ${meetingId} finalizada por el host`);
+            // Forzar desconexión
+            io.to(meetingId).emit('force-disconnect');
+        });
+        // WebRTC signaling events
         socket.on('webrtc-offer', (data) => {
             const { targetSocketId, offer } = data;
             console.log(`📞 [VOICE] Forwarding offer from ${socket.id} to ${targetSocketId}`);
@@ -116,22 +131,21 @@ const initializeVoice = (io, peerServer) => {
         });
         socket.on('media-state-change', (data) => {
             const { roomId, isAudioEnabled, isVideoEnabled } = data;
-            // Actualiza estado en activePeers si tienes un mapa de participantes
             socket.to(roomId).emit('media-state-changed', { socketId: socket.id, isAudioEnabled, isVideoEnabled });
         });
         socket.on('disconnect', (reason) => {
             console.log(`🔌 [VOICE] Socket disconnected: ${socket.id}, reason: ${reason}`);
-            // Cleanup peers on disconnect
+            const peerId = socketToPeer.get(socket.id);
             for (const [meetingId, peers] of activePeers) {
-                if (peers.has(socket.id)) {
-                    peers.delete(socket.id);
-                    io.to(meetingId).emit('peer-disconnected', socket.id);
-                    // Si no hay más peers, limpiar la reunión
+                if (peerId && peers.has(peerId)) {
+                    peers.delete(peerId);
+                    io.to(meetingId).emit('peer-disconnected', peerId);
                     if (peers.size === 0) {
                         activePeers.delete(meetingId);
                     }
                 }
             }
+            socketToPeer.delete(socket.id);
         });
         socket.on('error', (error) => {
             console.error(`💥 [VOICE] Socket error for ${socket.id}:`, error);
