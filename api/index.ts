@@ -17,15 +17,19 @@ const PORT = process.env.PORT || 10000;
 app.use(cors(corsOptions));
 app.use(corsMiddleware);
 
-/* -------------------- SOCKET.IO -------------------- */
+/* ===========================================================
+   SOCKET.IO
+   =========================================================== */
 const io = new SocketIOServer(server, {
   cors: corsOptions,
   transports: ['websocket', 'polling'],
   allowEIO3: true
 });
 
-/* -------------------- PEER.JS (FIX PARA RENDER) -------------------- */
-// ⚠️ EN RENDER: PeerJS debe vivir en `/` y no en subrutas
+/* ===========================================================
+   PEER.JS (FIX OBLIGATORIO PARA RENDER)
+   =========================================================== */
+// En Render, PeerJS DEBE usarse en `/`
 const peerOptions: any = {
   path: '/',
   debug: true,
@@ -36,7 +40,17 @@ console.log('🔧 [PEER] Configurando Peer.js con opciones:', peerOptions);
 
 const peerServer = ExpressPeerServer(server, peerOptions);
 
-/* -------------------- EVENTOS PEER -------------------- */
+/* ===========================================================
+   RUTA MANUAL PARA EVITAR QUE "/" MUESTRE EL JSON DE PEERJS
+   =========================================================== */
+// Esta ruta debe ir ANTES del peerServer
+app.get('/', (req, res) => {
+  res.send('Servidor de voz funcionando ✔');
+});
+
+/* ===========================================================
+   EVENTOS PEER.JS
+   =========================================================== */
 peerServer.on('connection', (client: any) => {
   console.log(`🔗 [PEER] Cliente conectado: ${client.getId()}`);
 });
@@ -53,15 +67,20 @@ peerServer.on('call', (call: any) => {
   console.log(`📞 [PEER] Llamada iniciada entre ${call.origin} y ${call.peer}`);
 });
 
-/* -------------------- MONTAR PEER SERVER EN ROOT -------------------- */
-// ⚠️ También montamos en `/`
+/* ===========================================================
+   MONTAR PEER SERVER EN ROOT
+   =========================================================== */
 app.use('/', corsMiddleware, peerServer);
 
-/* -------------------- RUTAS API -------------------- */
+/* ===========================================================
+   RUTAS API
+   =========================================================== */
 app.use(express.json());
 app.use('/api', healthRoutes);
 
-/* -------------------- MANEJO GLOBAL DE ERRORES -------------------- */
+/* ===========================================================
+   MANEJO GLOBAL DE ERRORES
+   =========================================================== */
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('💥 [ERROR] Error no manejado en voz:', err.message);
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
@@ -71,10 +90,14 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-/* -------------------- INICIALIZAR LÓGICA DE VOZ -------------------- */
+/* ===========================================================
+   INICIALIZAR LÓGICA DE VOZ
+   =========================================================== */
 initializeVoice(io, peerServer);
 
-/* -------------------- START SERVER -------------------- */
+/* ===========================================================
+   START SERVER
+   =========================================================== */
 server.listen(PORT, () => {
   console.log(`🌐 [STARTUP] Servidor de voz corriendo en puerto ${PORT}`);
   console.log(`🔗 [STARTUP] Peer.js disponible en: https://realtimevoicebackend.onrender.com/`);
