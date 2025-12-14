@@ -31,7 +31,7 @@ const io = new SocketIOServer(server, {
    =========================================================== */
 // En Render, PeerJS DEBE usarse en `/`
 const peerOptions: any = {
-  path: '/peerjs',  // Cambiado de '/' a '/peerjs'
+  path: '/',
   debug: true,
   proxied: true
 };
@@ -100,7 +100,7 @@ initializeVoice(io, peerServer);
    =========================================================== */
 server.listen(PORT, () => {
   console.log(`🌐 [STARTUP] Servidor de voz corriendo en puerto ${PORT}`);
-  console.log(`🔗 [STARTUP] Peer.js disponible en: https://realtimevoicebackend.onrender.com/peerjs`);
+  console.log(`🔗 [STARTUP] Peer.js disponible en: https://realtimevoicebackend.onrender.com/`);
   console.log(`🚀 [STARTUP] Health check: https://realtimevoicebackend.onrender.com/api/health`);
   console.log(`🌍 [STARTUP] CORS habilitado para:`, [
     'https://frontend-real-time.vercel.app',
