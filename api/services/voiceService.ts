@@ -16,7 +16,7 @@ import { db } from '../config/firebase';
  */
 const activePeers = new Map<string, Set<string>>();
 
-// ✅ NUEVO: Relación socket.id ↔ peerId
+// ✅ NEW: Socket.id ↔ peerId relationship
 const socketToPeer = new Map<string, string>();
 
 /**
@@ -47,7 +47,7 @@ export const initializeVoice = (io: SocketIOServer, peerServer: any) => {
   io.on('connection', (socket) => {
     console.log(`🔗 [VOICE] Socket connected: ${socket.id}`);
 
-    // Autenticación del socket
+    // Socket authentication
     socket.on('authenticate', (data: { token: string }) => {
       console.log(`🔐 [VOICE] Socket ${socket.id} autenticado`);
     });
@@ -76,7 +76,7 @@ export const initializeVoice = (io: SocketIOServer, peerServer: any) => {
         socket.join(meetingId);
 
         peers.add(peerId);
-        socketToPeer.set(socket.id, peerId); // ✅ NUEVO: guardar relación
+        socketToPeer.set(socket.id, peerId); // ✅ NEW: save relationship
 
         console.log(`✅ [VOICE] Peer ${peerId} joined voice room: ${meetingId}`);
 
@@ -89,7 +89,7 @@ export const initializeVoice = (io: SocketIOServer, peerServer: any) => {
           meetingId
         });
 
-        // Enviar lista de participantes al unirse
+        // Send list of participants upon joining
         const peersInRoom = Array.from(activePeers.get(meetingId) || []);
         socket.emit('room-participants', { 
           participants: peersInRoom
@@ -125,7 +125,7 @@ export const initializeVoice = (io: SocketIOServer, peerServer: any) => {
         }
       }
 
-      // ✅ NUEVO
+      // ✅ NEW
       socketToPeer.delete(socket.id);
     });
 
@@ -134,7 +134,7 @@ export const initializeVoice = (io: SocketIOServer, peerServer: any) => {
 
       console.log(`🔴 [VOICE] Meeting ${meetingId} finalizada por el host`);
 
-      // Forzar desconexión
+      // Force disconnection
       io.to(meetingId).emit('force-disconnect');
     });
 
